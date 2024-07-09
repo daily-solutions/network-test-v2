@@ -5,16 +5,26 @@ import {
   DailyCallQualityTestResults,
   DailyWebsocketConnectivityTestResults,
 } from "@daily-co/daily-js";
+import NetworkTester from "./NetworkTester.js";
+import { connect } from "http2";
+
+const CONNECTION_MODES = {
+  ALL: "all", // used to gather all candidates
+  STUN: "stun",
+  TURN_UDP: "turn-udp",
+  TURN_TCP: "turn-tcp",
+  TURN_TLS: "turn-tls",
+  RELAY_ONLY: "relay",
+};
+
 type State =
   | "idle"
   | "starting_call_quality"
   | "running_call_quality"
   | "finished_call_quality"
-  | "starting_network_connectivity"
-  | "running_network_connectivity"
-  | "finished_network_connectivity"
-  | "running_websocket_connectivity"
-  | "finished_websocket_connectivity";
+  | "starting_advanced"
+  | "running_advanced"
+  | "finished_advanced";
 
 function App() {
   const daily = useDaily();
@@ -23,10 +33,37 @@ function App() {
     useState<DailyCallQualityTestResults | null>(null);
   const [websocketConnectivity, setWebsocketConnectivity] =
     useState<DailyWebsocketConnectivityTestResults | null>(null);
-
+  const [connectionState, setConnectionState] = useState({
+    [CONNECTION_MODES.ALL]: {
+      result: null,
+      iceCandidates: null,
+    },
+    [CONNECTION_MODES.RELAY_ONLY]: {
+      result: null,
+      iceCandidates: null,
+    },
+    [CONNECTION_MODES.STUN]: {
+      result: null,
+      iceCandidates: null,
+    },
+    [CONNECTION_MODES.TURN_UDP]: {
+      result: null,
+      iceCandidates: null,
+    },
+    [CONNECTION_MODES.TURN_TCP]: {
+      result: null,
+      iceCandidates: null,
+    },
+    [CONNECTION_MODES.TURN_TLS]: {
+      result: null,
+      iceCandidates: null,
+    },
+  });
   async function startCallQuality() {
     setState("starting_call_quality");
-
+    daily?.on("error", (e) => {
+      console.log("got a daily-js error: ", e);
+    });
     await daily?.preAuth({ url: "https://chad-hq.daily.co/howdy" });
     // await daily?.startCamera();
     console.log("camera started; starting call quality test");
@@ -44,18 +81,59 @@ function App() {
     await daily?.stopTestCallQuality();
   }
 
-  async function startNetworkConnectivity() {
-    setState("starting_network_connectivity");
+  async function startAdvanced() {
+    setState("starting_advanced");
     //const nc = await daily?.testNetworkConnectivity();
+    const iceResp = await fetch("https://prod-ks.pluot.blue/tt-150331.json");
+    const iceServers = await iceResp.json();
+    setState("running_advanced");
+    const promises = Object.keys(connectionState).map((test) =>
+      initiateTester(test, iceServers)
+    );
+    promises.push(runWebsocketTest());
+    await Promise.all(promises);
+    setState("finished_advanced");
   }
 
-  async function startWebsocketConnectivity() {
-    setState("running_websocket_connectivity");
-    const wsc = await daily?.testWebsocketConnectivity();
-    if (wsc) {
-      setWebsocketConnectivity(wsc);
+  async function initiateTester(connectionMode: any, iceServers: any) {
+    const instance = new NetworkTester({
+      natService: "twilio",
+      connectionMode,
+      iceServers,
+    });
+    console.log("created test instance: ", instance);
+
+    // instance.setupRTCPeerConnection().then((result) => {
+    //   console.log("got a test result: ", result);
+    //   setConnectionState((prevState) => ({
+    //     ...prevState,
+    //     [connectionMode]: {
+    //       result: result.status,
+    //       iceCandidates: result.iceCandidates,
+    //     },
+    //   }));
+    // });
+    const result = await instance.setupRTCPeerConnection();
+    console.log("got a test result: ", result);
+    setConnectionState((prevState) => ({
+      ...prevState,
+      [connectionMode]: {
+        result: result.status,
+        iceCandidates: result.iceCandidates,
+      },
+    }));
+  }
+  async function runWebsocketTest() {
+    console.log("starting websocket test");
+    const ws = await daily?.testWebsocketConnectivity();
+    // .then((result) => {
+    //   if (result) {
+    //     setWebsocketConnectivity(result);
+    //   }
+    // });
+    if (ws) {
+      setWebsocketConnectivity(ws);
     }
-    setState("finished_websocket_connectivity");
   }
 
   function callQualityResultDescription() {
@@ -78,18 +156,10 @@ function App() {
   switch (state) {
     case "starting_call_quality":
       return <h2>Starting call quality test, please wait a few seconds...</h2>;
-    case "starting_network_connectivity":
-      return (
-        <h2>
-          Starting network connectivity test, please wait a few seconds...
-        </h2>
-      );
-    case "running_websocket_connectivity":
-      return (
-        <h2>
-          Running websocket connectivity test, please wait a few seconds...
-        </h2>
-      );
+    case "starting_advanced":
+      return <h2>Starting advanced tests, please wait a few seconds...</h2>;
+    case "running_advanced":
+      return <h2>Running advanced tests, please wait a few seconds...</h2>;
     case "running_call_quality":
       return (
         <div>
@@ -115,39 +185,50 @@ function App() {
           <p>You can run other tests too:</p>
           <button
             onClick={() => {
-              startNetworkConnectivity();
+              startAdvanced();
             }}
           >
-            Network Connectivity
-          </button>
-          <button
-            onClick={() => {
-              startWebsocketConnectivity();
-            }}
-          >
-            Websocket Connectivity
+            Advanced Tests
           </button>
         </div>
       );
-    case "finished_websocket_connectivity":
+    case "finished_advanced":
       return (
-        <div>
-          <h2>Websocket Connectivity Results</h2>
-          <p>{JSON.stringify(websocketConnectivity)}</p>
-        </div>
+        <>
+          <div>
+            <h2>Websocket Connectivity Results</h2>
+            <p>{JSON.stringify(websocketConnectivity)}</p>
+          </div>
+          <div>
+            <h2>Network Connectivity Results</h2>
+            <p>{JSON.stringify(connectionState)}</p>
+          </div>
+        </>
       );
     default:
       return (
-        <div>
-          <h1>Network Test</h1>
-          <button
-            onClick={() => {
-              startCallQuality();
-            }}
-          >
-            Start Test
-          </button>
-        </div>
+        <>
+          <div>
+            <h1>Call Test</h1>
+            <button
+              onClick={() => {
+                startCallQuality();
+              }}
+            >
+              Start Call Test
+            </button>
+          </div>
+          <div>
+            <h2>Connection Type Test</h2>
+            <button
+              onClick={() => {
+                startAdvanced();
+              }}
+            >
+              Start Network Test
+            </button>
+          </div>
+        </>
       );
   }
 }

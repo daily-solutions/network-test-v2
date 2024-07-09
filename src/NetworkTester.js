@@ -140,18 +140,20 @@ export default class NetworkTester {
       iceServers: this.iceServers,
       iceTransportPolicy,
     };
-
+    /* TODO-CB: Removing this because only Safari needs it anyway
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: true,
       video: true,
     });
-
+    */
     this.localPeer = new RTCPeerConnection(rtcConfig);
     this.remotePeer = new RTCPeerConnection(rtcConfig);
 
+    /* TODO-CB: Safari
     stream.getTracks().forEach((track) => {
       this.localPeer.addTrack(track, stream);
     });
+    */
     global.localPeer = this.localPeer;
 
     this.localPeer.bufferedIceCandidates = [];
