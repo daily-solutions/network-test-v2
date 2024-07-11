@@ -1,5 +1,5 @@
 export const CONNECTION_MODES = {
-  ALL: "all", // used to gather all candidates
+  ANY: "any", // used to gather all candidates
   STUN: "stun",
   TURN_UDP: "turn-udp",
   TURN_TCP: "turn-tcp",
@@ -21,12 +21,12 @@ export const CONNECTION_STATUS = {
 export default class NetworkTester {
   constructor({
     natService = NAT_SERVICES.TWILIO,
-    connectionMode = CONNECTION_MODES.RELAY_ONLY,
+    connectionMode = CONNECTION_MODES.ANY,
     iceServers,
   }) {
     if (natService === NAT_SERVICES.TWILIO) {
       switch (connectionMode) {
-        case CONNECTION_MODES.ALL:
+        case CONNECTION_MODES.ANY:
         case CONNECTION_MODES.RELAY_ONLY:
           this.iceServers = iceServers;
           break;
@@ -56,7 +56,7 @@ export default class NetworkTester {
       }
     } else {
       switch (connectionMode) {
-        case CONNECTION_MODES.ALL:
+        case CONNECTION_MODES.ANY:
         case CONNECTION_MODES.RELAY_ONLY:
           // Xirsys returns an object when we need an array
           this.iceServers = [iceServers];

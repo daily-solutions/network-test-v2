@@ -9,7 +9,7 @@ import NetworkTester from "./NetworkTester.js";
 import { connect } from "http2";
 
 const CONNECTION_MODES = {
-  ALL: "all", // used to gather all candidates
+  ANY: "any", // used to gather all candidates
   STUN: "stun",
   TURN_UDP: "turn-udp",
   TURN_TCP: "turn-tcp",
@@ -34,7 +34,7 @@ function App() {
   const [websocketConnectivity, setWebsocketConnectivity] =
     useState<DailyWebsocketConnectivityTestResults | null>(null);
   const [connectionState, setConnectionState] = useState({
-    [CONNECTION_MODES.ALL]: {
+    [CONNECTION_MODES.ANY]: {
       result: null,
       iceCandidates: null,
     },
@@ -153,6 +153,63 @@ function App() {
     }
   }
 
+  function websocketResults() {
+    if (websocketConnectivity) {
+      let results: JSX.Element[] = [];
+      results.push(<strong>{websocketConnectivity.result}</strong>);
+      if (
+        websocketConnectivity?.failedRegions &&
+        websocketConnectivity?.failedRegions.length > 0
+      ) {
+        const els = websocketConnectivity.failedRegions.map((r) => (
+          <li>{r}</li>
+        ));
+        results.push(
+          <p>
+            <strong>Failed regions:</strong>
+          </p>
+        );
+        results.push(<ul>{els}</ul>);
+      }
+      return <div>{results}</div>;
+    } else {
+      return <div>No results.</div>;
+    }
+  }
+
+  function networkTestResults() {
+    if (connectionState) {
+      console.log({ connectionState });
+      let results: JSX.Element[] = [];
+
+      const all_results = Object.values(connectionState).map((e) => e.result);
+      // Set removes duplicates
+      const all_passed = all_results.every((e) => e == "connected");
+      if (all_passed) {
+        // Then everything connected; we can show simplified results
+        results.push(<p>Passed!</p>);
+      } else {
+        const types = Object.entries(connectionState).map(([key, value]) => (
+          <li>
+            {key}: {value.result}
+          </li>
+        ));
+        results.push(<ul>{types}</ul>);
+      }
+      // typescript weirdness
+      const any_candidates: any = connectionState["any"];
+      if (any_candidates["iceCandidates"]) {
+        const ccc = any_candidates["iceCandidates"].map(
+          (i: RTCIceCandidate) => <li>{i.candidate}</li>
+        );
+        results.push(<ul>{ccc}</ul>);
+      }
+      return <div>{results}</div>;
+    } else {
+      return <p>No results.</p>;
+    }
+  }
+
   switch (state) {
     case "starting_call_quality":
       return <h2>Starting call quality test, please wait a few seconds...</h2>;
@@ -197,11 +254,11 @@ function App() {
         <>
           <div>
             <h2>Websocket Connectivity Results</h2>
-            <p>{JSON.stringify(websocketConnectivity)}</p>
+            <div>{websocketResults()}</div>
           </div>
           <div>
             <h2>Network Connectivity Results</h2>
-            <p>{JSON.stringify(connectionState)}</p>
+            <div>{networkTestResults()}</div>
           </div>
         </>
       );
