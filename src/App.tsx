@@ -190,7 +190,7 @@ function App() {
         results.push(<p>Passed!</p>);
       } else {
         const types = Object.entries(connectionState).map(([key, value]) => (
-          <li>
+          <li key={key}>
             {key}: {value.result}
           </li>
         ));
@@ -200,7 +200,7 @@ function App() {
       const any_candidates: any = connectionState["any"];
       if (any_candidates["iceCandidates"]) {
         const ccc = any_candidates["iceCandidates"].map(
-          (i: RTCIceCandidate) => <li>{i.candidate}</li>
+          (i: RTCIceCandidate) => <li key={i.candidate}>{i.candidate}</li>
         );
         results.push(<ul>{ccc}</ul>);
       }
