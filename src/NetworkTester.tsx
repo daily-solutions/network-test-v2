@@ -19,11 +19,31 @@ export const CONNECTION_STATUS = {
 };
 
 export default class NetworkTester {
+  iceServers: any;
+  natService: any;
+  connectionMode: any;
+  constraints: {
+    video: {
+      deviceId: string;
+      facingMode: string;
+      width: number;
+      height: number;
+    };
+    audio: { deviceId: string };
+  };
+  offerOptions: { offerToReceiveAudio: boolean; offerToReceiveVideo: boolean };
+  localPeer: any;
+  remotePeer: any;
+  resolve: any;
+  reject: any;
+  connectionTimeout: any;
+  flushTimeout: any;
+
   constructor({
     natService = NAT_SERVICES.TWILIO,
     connectionMode = CONNECTION_MODES.ANY,
     iceServers,
-  }) {
+  }: any) {
     if (natService === NAT_SERVICES.TWILIO) {
       switch (connectionMode) {
         case CONNECTION_MODES.ANY:
@@ -32,23 +52,25 @@ export default class NetworkTester {
           break;
         case CONNECTION_MODES.STUN:
           this.iceServers = iceServers.filter(
-            (url) =>
+            (url: { url: string; urls: string }) =>
               url?.url.startsWith("stun:") || url?.urls.startsWith("stun:")
           );
           break;
         case CONNECTION_MODES.TURN_UDP:
           this.iceServers = iceServers.filter(
-            (url) => url?.url.startsWith("turn:") && url?.url.endsWith("udp")
+            (url: { url: string; urls: string }) =>
+              url?.url.startsWith("turn:") && url?.url.endsWith("udp")
           );
           break;
         case CONNECTION_MODES.TURN_TCP:
           this.iceServers = iceServers.filter(
-            (url) => url?.url.startsWith("turn:") && url?.url.endsWith("tcp")
+            (url: { url: string; urls: string }) =>
+              url?.url.startsWith("turn:") && url?.url.endsWith("tcp")
           );
           break;
         case CONNECTION_MODES.TURN_TLS:
-          this.iceServers = iceServers.filter((url) =>
-            url?.url.includes("turns:")
+          this.iceServers = iceServers.filter(
+            (url: { url: string; urls: string }) => url?.url.includes("turns:")
           );
           break;
         default:
@@ -65,7 +87,9 @@ export default class NetworkTester {
           this.iceServers = [
             {
               ...iceServers,
-              urls: iceServers.urls.filter((url) => url.startsWith("stun:")),
+              urls: iceServers.urls.filter((url: string) =>
+                url.startsWith("stun:")
+              ),
             },
           ];
           break;
@@ -74,7 +98,7 @@ export default class NetworkTester {
             {
               ...iceServers,
               urls: iceServers.urls.filter(
-                (url) => url.startsWith("turn:") && url.endsWith("udp")
+                (url: string) => url.startsWith("turn:") && url.endsWith("udp")
               ),
             },
           ];
@@ -84,7 +108,7 @@ export default class NetworkTester {
             {
               ...iceServers,
               urls: iceServers.urls.filter(
-                (url) => url.startsWith("turn:") && url.endsWith("tcp")
+                (url: string) => url.startsWith("turn:") && url.endsWith("tcp")
               ),
             },
           ];
@@ -93,7 +117,9 @@ export default class NetworkTester {
           this.iceServers = [
             {
               ...iceServers,
-              urls: iceServers.urls.filter((url) => url.startsWith("turns:")),
+              urls: iceServers.urls.filter((url: string) =>
+                url.startsWith("turns:")
+              ),
             },
           ];
           break;
@@ -136,7 +162,7 @@ export default class NetworkTester {
       ? "relay"
       : "all";
 
-    const rtcConfig = {
+    const rtcConfig: RTCConfiguration = {
       iceServers: this.iceServers,
       iceTransportPolicy,
     };
@@ -154,6 +180,7 @@ export default class NetworkTester {
       this.localPeer.addTrack(track, stream);
     });
     */
+    // @ts-ignore
     global.localPeer = this.localPeer;
 
     this.localPeer.bufferedIceCandidates = [];
@@ -179,7 +206,7 @@ export default class NetworkTester {
   }
 
   setupPeerListeners() {
-    this.localPeer.onicecandidate = (event) => {
+    this.localPeer.onicecandidate = (event: any) => {
       if (
         this.connectionMode === CONNECTION_MODES.STUN &&
         // Firefox doesn't support the "type" property, so better be safe and parse
@@ -197,7 +224,7 @@ export default class NetworkTester {
       this.remotePeer.bufferedIceCandidates.push(event.candidate);
     };
 
-    this.remotePeer.onicecandidate = (event) => {
+    this.remotePeer.onicecandidate = (event: any) => {
       if (!event.candidate || !event.candidate.candidate) {
         this.flushIceCandidates(this.localPeer);
         return;
@@ -207,11 +234,13 @@ export default class NetworkTester {
 
     if (this.localPeer.connectionState) {
       this.localPeer.onconnectionstatechange = () =>
-        this.onConnectionStateChange(this.localPeer.connectionState);
+        //this.onConnectionStateChange(this.localPeer.connectionState);
+        this.onConnectionStateChange();
     } else {
       // Legacy connection state
-      this.localPeer.oniceconnectionstatechange = (event) =>
-        this.onIceConnectionStateChange(event);
+      this.localPeer.oniceconnectionstatechange = (event: any) =>
+        //this.onIceConnectionStateChange(event);
+        this.onIceConnectionStateChange();
     }
   }
 
@@ -220,20 +249,20 @@ export default class NetworkTester {
     await this.createAnswer();
   }
 
-  flushIceCandidates(peer) {
-    peer.bufferedIceCandidates.forEach((c) => peer.addIceCandidate(c));
+  flushIceCandidates(peer: any) {
+    peer.bufferedIceCandidates.forEach((c: any) => peer.addIceCandidate(c));
     peer.bufferedIceCandidates = [];
   }
 
   createOffer() {
     return this.localPeer
       .createOffer(this.offerOptions)
-      .then((desc) =>
+      .then((desc: any) =>
         this.setDescription(desc, this.localPeer, this.remotePeer)
       );
   }
 
-  async setDescription(desc, local, remote) {
+  async setDescription(desc: any, local: any, remote: any) {
     await local.setLocalDescription(desc);
     await remote.setRemoteDescription(desc);
   }
@@ -241,7 +270,7 @@ export default class NetworkTester {
   createAnswer() {
     return this.remotePeer
       .createAnswer(this.offerOptions)
-      .then((desc) =>
+      .then((desc: any) =>
         this.setDescription(desc, this.remotePeer, this.localPeer)
       );
   }

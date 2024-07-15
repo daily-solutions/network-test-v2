@@ -1,11 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import "./App.css";
 import { useDaily } from "@daily-co/daily-react";
 import {
   DailyCallQualityTestResults,
   DailyWebsocketConnectivityTestResults,
 } from "@daily-co/daily-js";
-import NetworkTester from "./NetworkTester.js";
+import NetworkTester from "./NetworkTester";
 import { connect } from "http2";
 
 const CONNECTION_MODES = {
@@ -59,8 +59,9 @@ function App() {
       iceCandidates: null,
     },
   });
-  async function startCallQuality() {
+  const startCallQuality = useCallback(async () => {
     setState("starting_call_quality");
+    console.log("in here, daily is ", daily);
     daily?.on("error", (e) => {
       console.log("got a daily-js error: ", e);
     });
@@ -75,7 +76,7 @@ function App() {
       setCallQuality(cq);
     }
     setState("finished_call_quality");
-  }
+  }, [setCallQuality, setState, daily]);
 
   async function stopCallQuality() {
     await daily?.stopTestCallQuality();
@@ -113,7 +114,7 @@ function App() {
     //     },
     //   }));
     // });
-    const result = await instance.setupRTCPeerConnection();
+    const result: any = await instance.setupRTCPeerConnection();
     console.log("got a test result: ", result);
     setConnectionState((prevState) => ({
       ...prevState,
@@ -267,13 +268,7 @@ function App() {
         <>
           <div>
             <h1>Call Test</h1>
-            <button
-              onClick={() => {
-                startCallQuality();
-              }}
-            >
-              Start Call Test
-            </button>
+            <button onClick={startCallQuality}>Start Call Test</button>
           </div>
           <div>
             <h2>Connection Type Test</h2>
